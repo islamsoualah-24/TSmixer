@@ -1,19 +1,5 @@
 # coding=utf-8
-# Copyright 2024 The Google Research Authors.
-#
-# Licensed under the Apache License, Version 2.0 (the "License");
-# you may not use this file except in compliance with the License.
-# You may obtain a copy of the License at
-#
-#     http://www.apache.org/licenses/LICENSE-2.0
-#
-# Unless required by applicable law or agreed to in writing, software
-# distributed under the License is distributed on an "AS IS" BASIS,
-# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-# See the License for the specific language governing permissions and
-# limitations under the License.
-
-"""Implementation of TSMixer."""
+"""Implementation of TSMixer (fixed for Keras compatibility)."""
 
 import tensorflow as tf
 from tensorflow.keras import layers
@@ -29,20 +15,20 @@ def res_block(inputs, norm_type, activation, dropout, ff_dim):
   )
 
   # Temporal Linear
-  #x = norm(axis=[-2, -1])(inputs)
-  x = tf.transpose(inputs, perm=[0, 2, 1])  # [Batch, Channel, Input Length]
-  x = layers.Dense(x.shape[-1], activation=activation)(x)
-  x = tf.transpose(x, perm=[0, 2, 1])  # [Batch, Input Length, Channel]
+  # x = norm(axis=[-2, -1])(inputs)
+
+  # بدل tf.transpose -> layers.Permute
+  x = layers.Permute((2, 1))(inputs)  # [Batch, Channel, Input Length]
+  x = layers.Dense(tf.shape(inputs)[1], activation=activation)(x)
+  x = layers.Permute((2, 1))(x)       # [Batch, Input Length, Channel]
   x = layers.Dropout(dropout)(x)
   res = x + inputs
 
   # Feature Linear
-  #x = norm(axis=[-2, -1])(res)
-  x = layers.Dense(ff_dim, activation=activation)(
-      res
-  )  # [Batch, Input Length, FF_Dim]
+  # x = norm(axis=[-2, -1])(res)
+  x = layers.Dense(ff_dim, activation=activation)(res)
   x = layers.Dropout(dropout)(x)
-  x = layers.Dense(inputs.shape[-1])(x)  # [Batch, Input Length, Channel]
+  x = layers.Dense(inputs.shape[-1])(x)
   x = layers.Dropout(dropout)(x)
   return x + res
 
@@ -67,7 +53,8 @@ def build_model(
   if target_slice:
     x = x[:, :, target_slice]
 
-  x = tf.transpose(x, perm=[0, 2, 1])  # [Batch, Channel, Input Length]
-  x = layers.Dense(pred_len)(x)  # [Batch, Channel, Output Length]
-  outputs = tf.transpose(x, perm=[0, 2, 1])  # [Batch, Output Length, Channel])
+  # بدل tf.transpose -> Permute
+  x = layers.Permute((2, 1))(x)       # [Batch, Channel, Input Length]
+  x = layers.Dense(pred_len)(x)       # [Batch, Channel, Output Length]
+  outputs = layers.Permute((2, 1))(x) # [Batch, Output Length, Channel]
   return tf.keras.Model(inputs, outputs)
