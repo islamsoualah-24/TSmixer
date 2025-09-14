@@ -22,19 +22,26 @@ from tensorflow.keras import layers
 class RevNorm(layers.Layer):
   """Reversible Instance Normalization."""
 
-  def __init__(self, axis, eps=1e-5, affine=True):
-    super().__init__()
+  def __init__(self, axis, eps=1e-5, affine=True, **kwargs):
+    super().__init__(**kwargs)
     self.axis = axis
     self.eps = eps
     self.affine = affine
 
   def build(self, input_shape):
+    dim = input_shape[-1]   # عدد القنوات/المميزات
     if self.affine:
       self.affine_weight = self.add_weight(
-          'affine_weight', shape=input_shape[-1], initializer='ones'
+          name="affine_weight",
+          shape=(dim,),
+          initializer="ones",
+          trainable=True,
       )
       self.affine_bias = self.add_weight(
-          'affine_bias', shape=input_shape[-1], initializer='zeros'
+          name="affine_bias",
+          shape=(dim,),
+          initializer="zeros",
+          trainable=True,
       )
 
   def call(self, x, mode, target_slice=None):
@@ -58,11 +65,9 @@ class RevNorm(layers.Layer):
     )
 
   def _normalize(self, x):
-    x = x - self.mean
-    x = x / self.stdev
+    x = (x - self.mean) / self.stdev
     if self.affine:
-      x = x * self.affine_weight
-      x = x + self.affine_bias
+      x = x * self.affine_weight + self.affine_bias
     return x
 
   def _denormalize(self, x, target_slice=None):
